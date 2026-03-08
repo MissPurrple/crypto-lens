@@ -28,11 +28,6 @@ export default function AnalyzePage() {
         setUrl(prefill.url);
         setTab("url");
       }
-      if (prefill.rawText) {
-        setRawText(prefill.rawText);
-        setTab("paste");
-      }
-      // Clear the state so refresh doesn't re-prefill
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
