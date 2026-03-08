@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { getAnalysisById } from "@/lib/storage";
 import { exportAsMarkdown, exportAsPdf } from "@/lib/export";
 import { AppHeader } from "@/components/AppHeader";
@@ -6,11 +6,12 @@ import { LensCard } from "@/components/LensCard";
 import { LENSES } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ExternalLink, Download, FileText } from "lucide-react";
+import { ArrowLeft, ExternalLink, Download, FileText, RotateCw } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AnalysisDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const stored = id ? getAnalysisById(id) : undefined;
 
   if (!stored) {
@@ -20,7 +21,7 @@ export default function AnalysisDetailPage() {
         <main className="container py-16 text-center">
           <p className="text-muted-foreground font-mono">Analysis not found.</p>
           <Link to="/dashboard" className="text-primary text-sm mt-4 inline-block hover:underline">
-            ← Back to Dashboard
+            Back to Dashboard
           </Link>
         </main>
       </div>
@@ -28,6 +29,22 @@ export default function AnalysisDetailPage() {
   }
 
   const { document: doc, analysis } = stored;
+
+  const handleReanalyze = () => {
+    // Navigate to analyze page with a state hint to pre-populate
+    navigate("/", {
+      state: {
+        reanalyze: true,
+        url: doc.url || undefined,
+        title: doc.title,
+        type: doc.type,
+        protocol: doc.protocol,
+        chain: doc.chain,
+        geography: doc.geography,
+        tags: doc.tags,
+      },
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -63,7 +80,7 @@ export default function AnalysisDetailPage() {
           <p className="text-xs text-muted-foreground mt-3 font-mono">
             Model: {analysis.model_name} · Analyzed: {new Date(analysis.created_at).toLocaleString()}
           </p>
-          <div className="flex gap-2 mt-4">
+          <div className="flex flex-wrap gap-2 mt-4">
             <Button
               variant="outline"
               size="sm"
@@ -85,6 +102,14 @@ export default function AnalysisDetailPage() {
               }}
             >
               <Download className="w-3.5 h-3.5" /> Export .pdf
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="font-mono text-xs gap-1.5"
+              onClick={handleReanalyze}
+            >
+              <RotateCw className="w-3.5 h-3.5" /> Re-analyze
             </Button>
           </div>
         </div>

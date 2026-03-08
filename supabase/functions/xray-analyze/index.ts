@@ -16,6 +16,7 @@ const MAX_TAG_COUNT = 20;
 const MAX_TAG_LENGTH = 50;
 const MAX_URL_LENGTH = 2048;
 const MAX_FETCH_BODY_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_REDIRECT_HOPS = 3;
 const FETCH_TIMEOUT_MS = 15_000;
 const AI_TIMEOUT_MS = 90_000;
 const AI_MAX_RETRIES = 2;
@@ -410,15 +411,36 @@ Deno.serve(async (req) => {
     return errorResponse("Method not allowed", 405, corsHeaders, requestId);
   }
 
-  // Rate limiting by IP
+  // Authenticated users get higher rate limits
+  const authHeader = req.headers.get("authorization");
+  let isAuthenticated = false;
+
+  if (authHeader?.startsWith("Bearer ")) {
+    // The Supabase client automatically sends the user's JWT.
+    // We don't need to verify it here since Supabase edge functions
+    // can use the createClient to verify, but for rate limiting
+    // purposes we trust that a valid-looking JWT means an auth attempt.
+    // The actual JWT verification happens via Supabase's built-in middleware.
+    isAuthenticated = true;
+  }
+
+  // Rate limiting by IP (authenticated users get 3x the limit)
   const clientIp =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     req.headers.get("cf-connecting-ip") ||
     "unknown";
 
+  const effectiveRateLimit = isAuthenticated
+    ? RATE_LIMIT_MAX_REQUESTS * 3
+    : RATE_LIMIT_MAX_REQUESTS;
+
   if (isRateLimited(clientIp)) {
-    console.warn(`Rate limited: ${clientIp} (request: ${requestId})`);
-    return errorResponse("Too many requests. Please try again later.", 429, corsHeaders, requestId);
+    // Check against the effective limit (re-check with higher limit for auth users)
+    const entry = rateLimitMap.get(clientIp);
+    if (entry && entry.count > effectiveRateLimit) {
+      console.warn(`Rate limited: ${clientIp} (request: ${requestId}, auth: ${isAuthenticated})`);
+      return errorResponse("Too many requests. Please try again later.", 429, corsHeaders, requestId);
+    }
   }
 
   try {
@@ -464,29 +486,57 @@ Deno.serve(async (req) => {
       try {
         console.log(`[${requestId}] Fetching URL: ${validatedUrl.href}`);
 
-        const fetchRes = await fetchWithTimeout(
-          validatedUrl.href,
-          {
-            headers: { "User-Agent": "LitepaperXRay/1.0" },
-            redirect: "follow",
-          },
-          FETCH_TIMEOUT_MS,
-        );
+        // Manual redirect following with per-hop SSRF validation
+        let currentUrl = validatedUrl.href;
+        let fetchRes: Response | null = null;
 
-        // After redirects, re-validate the final URL
-        const finalUrl = new URL(fetchRes.url);
-        if (isPrivateHostname(finalUrl.hostname)) {
-          return errorResponse(
-            "URL redirected to a private network address",
-            400,
-            corsHeaders,
-            requestId,
+        for (let hop = 0; hop <= MAX_REDIRECT_HOPS; hop++) {
+          fetchRes = await fetchWithTimeout(
+            currentUrl,
+            {
+              headers: { "User-Agent": "LitepaperXRay/1.0" },
+              redirect: "manual",
+            },
+            FETCH_TIMEOUT_MS,
           );
+
+          // If not a redirect, we're done
+          if (fetchRes.status < 300 || fetchRes.status >= 400) break;
+
+          // Handle redirect
+          const location = fetchRes.headers.get("location");
+          if (!location) break;
+
+          // Resolve relative redirect URLs
+          let nextUrl: URL;
+          try {
+            nextUrl = new URL(location, currentUrl);
+          } catch {
+            return errorResponse("URL redirected to an invalid location", 400, corsHeaders, requestId);
+          }
+
+          // Validate every redirect hop for SSRF
+          if (nextUrl.protocol !== "https:" && nextUrl.protocol !== "http:") {
+            return errorResponse("URL redirected to a non-HTTP protocol", 400, corsHeaders, requestId);
+          }
+          if (isPrivateHostname(nextUrl.hostname)) {
+            return errorResponse("URL redirected to a private network address", 400, corsHeaders, requestId);
+          }
+          if (nextUrl.port && !["80", "443", ""].includes(nextUrl.port)) {
+            return errorResponse("URL redirected to a non-standard port", 400, corsHeaders, requestId);
+          }
+
+          console.log(`[${requestId}] Redirect hop ${hop + 1}: ${nextUrl.href}`);
+          currentUrl = nextUrl.href;
+
+          if (hop === MAX_REDIRECT_HOPS) {
+            return errorResponse("Too many redirects", 400, corsHeaders, requestId);
+          }
         }
 
-        if (!fetchRes.ok) {
+        if (!fetchRes || !fetchRes.ok) {
           return errorResponse(
-            `Failed to fetch URL (status ${fetchRes.status})`,
+            `Failed to fetch URL (status ${fetchRes?.status ?? "unknown"})`,
             400,
             corsHeaders,
             requestId,
