@@ -38,13 +38,50 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { title, type, protocol, chain, url, tags, geography, raw_text } = body;
+    let { title, type, protocol, chain, url, tags, geography, raw_text, fetch_url } = body;
 
-    if (!raw_text || !title || !type) {
+    // If fetch_url is true and we have a URL but no raw_text, fetch the URL content
+    if (fetch_url && url && !raw_text) {
+      try {
+        console.log("Fetching URL:", url);
+        const fetchRes = await fetch(url, {
+          headers: { "User-Agent": "LitepaperXRay/1.0" },
+        });
+        if (!fetchRes.ok) {
+          return new Response(
+            JSON.stringify({ error: `Failed to fetch URL: ${fetchRes.status} ${fetchRes.statusText}` }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        raw_text = await fetchRes.text();
+        // Strip HTML tags for a rough plain-text extraction
+        raw_text = raw_text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "");
+        raw_text = raw_text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+        raw_text = raw_text.replace(/<[^>]+>/g, " ");
+        raw_text = raw_text.replace(/\s+/g, " ").trim();
+        title = title || url;
+        console.log(`Fetched ${raw_text.length} chars from URL`);
+      } catch (fetchErr) {
+        console.error("URL fetch error:", fetchErr);
+        return new Response(
+          JSON.stringify({ error: `Could not fetch URL: ${String(fetchErr)}` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    if (!raw_text) {
       return new Response(
-        JSON.stringify({ error: "title, type, and raw_text are required" }),
+        JSON.stringify({ error: "No document text provided" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    if (!title) {
+      title = raw_text.split("\n")[0]?.slice(0, 100) || "Untitled";
+    }
+    if (!type) {
+      type = "other";
     }
 
     const aiBaseUrl = Deno.env.get("VENICE_BASE_URL") || "https://api.venice.ai/api/v1";
@@ -58,15 +95,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    const userMessage = `Analyze this ${type.replace("_", " ")}${protocol ? ` from ${protocol}` : ""}${chain ? ` on ${chain}` : ""}:
+    const userMessage = `Analyze this document:
 
 Title: ${title}
 ${url ? `URL: ${url}` : ""}
-${tags?.length ? `Tags: ${tags.join(", ")}` : ""}
-${geography ? `Geography: ${geography}` : ""}
 
 --- DOCUMENT TEXT ---
-${raw_text}
+${raw_text.slice(0, 30000)}
 --- END DOCUMENT TEXT ---`;
 
     const aiResponse = await fetch(`${aiBaseUrl}/chat/completions`, {
@@ -104,7 +139,6 @@ ${raw_text}
       );
     }
 
-    // Try to parse JSON from the response (handle potential markdown fences)
     let analysis;
     try {
       const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
