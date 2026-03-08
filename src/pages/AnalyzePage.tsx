@@ -86,6 +86,7 @@ export default function AnalyzePage() {
         id: crypto.randomUUID(),
         document: data.document,
         analysis: data.analysis,
+        raw_text: input.text || undefined,
       };
 
       saveAnalysis(stored);
