@@ -63,6 +63,30 @@ export default function AnalysisDetailPage() {
           <p className="text-xs text-muted-foreground mt-3 font-mono">
             Model: {analysis.model_name} · Analyzed: {new Date(analysis.created_at).toLocaleString()}
           </p>
+          <div className="flex gap-2 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              className="font-mono text-xs gap-1.5"
+              onClick={() => {
+                exportAsMarkdown(stored);
+                toast.success("Markdown exported");
+              }}
+            >
+              <FileText className="w-3.5 h-3.5" /> Export .md
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="font-mono text-xs gap-1.5"
+              onClick={async () => {
+                await exportAsPdf(stored);
+                toast.success("PDF exported");
+              }}
+            >
+              <Download className="w-3.5 h-3.5" /> Export .pdf
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-4">
