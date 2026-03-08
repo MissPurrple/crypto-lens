@@ -1,5 +1,5 @@
-import { Analysis, LENSES } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Analysis, LENSES } from "@/lib/types";
 
 interface LensCardProps {
   lensKey: keyof Pick<Analysis, "effectiveness" | "devil_advocate" | "best_points" | "could_do_better" | "power_snapshot">;

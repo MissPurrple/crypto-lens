@@ -1,52 +1,71 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppHeader } from "@/components/AppHeader";
-import { DOCUMENT_TYPES, CHAINS, DocumentType, StoredAnalysis } from "@/lib/types";
+import { LensesCard } from "@/components/LensesCard";
+import { StoredAnalysis } from "@/lib/types";
 import { saveAnalysis } from "@/lib/storage";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, FileText, Link2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AnalyzePage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({
-    title: "",
-    type: "" as DocumentType | "",
-    protocol: "",
-    chain: "",
-    url: "",
-    tags: "",
-    geography: "",
-    raw_text: "",
-  });
+  const [tab, setTab] = useState("paste");
+  const [rawText, setRawText] = useState("");
+  const [url, setUrl] = useState("");
+  const [fileName, setFileName] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.title || !form.type || !form.raw_text) {
-      toast.error("Title, type, and document text are required");
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      setRawText(text);
+      setTab("paste");
+      toast.success(`Loaded "${file.name}"`);
+    };
+    reader.readAsText(file);
+  }, []);
+
+  const getInputText = (): { text: string; title: string } | null => {
+    if (tab === "paste" && rawText.trim()) {
+      const title = rawText.trim().split("\n")[0].slice(0, 100);
+      return { text: rawText.trim(), title };
+    }
+    if (tab === "url" && url.trim()) {
+      return { text: "", title: url.trim() };
+    }
+    return null;
+  };
+
+  const handleSubmit = async () => {
+    const input = getInputText();
+    if (!input) {
+      toast.error("Please paste text, upload a document, or enter a URL");
       return;
     }
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("xray-analyze", {
-        body: {
-          title: form.title,
-          type: form.type,
-          protocol: form.protocol || undefined,
-          chain: form.chain || undefined,
-          url: form.url || undefined,
-          tags: form.tags ? form.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
-          geography: form.geography || undefined,
-          raw_text: form.raw_text,
-        },
-      });
+      const body: Record<string, unknown> = {
+        title: input.title,
+        type: "other",
+        raw_text: input.text,
+      };
+
+      if (tab === "url") {
+        body.url = url.trim();
+        body.fetch_url = true;
+      }
+
+      const { data, error } = await supabase.functions.invoke("xray-analyze", { body });
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -68,130 +87,90 @@ export default function AnalyzePage() {
     }
   };
 
+  const hasInput = (tab === "paste" && rawText.trim()) || (tab === "url" && url.trim());
+
   return (
     <div className="min-h-screen bg-background">
       <AppHeader />
       <main className="container max-w-3xl py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-mono font-bold text-gradient-cyan mb-2">Analyze Document</h1>
+        <div className="mb-6">
+          <h1 className="text-2xl font-mono font-bold text-gradient-primary mb-2">Analyze Document</h1>
           <p className="text-sm text-muted-foreground">
-            Paste any crypto document for a ruthless, structured breakdown across five analytical lenses.
+            Paste text, upload a file, or submit a URL for a ruthless, structured breakdown.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="title" className="font-mono text-xs uppercase tracking-wider">Title *</Label>
-              <Input
-                id="title"
-                placeholder="e.g. Uniswap v4 Governance Proposal"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                className="bg-secondary border-border"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="type" className="font-mono text-xs uppercase tracking-wider">Type *</Label>
-              <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v as DocumentType })}>
-                <SelectTrigger className="bg-secondary border-border">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DOCUMENT_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+        <LensesCard />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="protocol" className="font-mono text-xs uppercase tracking-wider">Protocol</Label>
-              <Input
-                id="protocol"
-                placeholder="e.g. Uniswap, Aave, Arbitrum"
-                value={form.protocol}
-                onChange={(e) => setForm({ ...form, protocol: e.target.value })}
-                className="bg-secondary border-border"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="chain" className="font-mono text-xs uppercase tracking-wider">Chain</Label>
-              <Select value={form.chain} onValueChange={(v) => setForm({ ...form, chain: v })}>
-                <SelectTrigger className="bg-secondary border-border">
-                  <SelectValue placeholder="Select chain" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CHAINS.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+        <Tabs value={tab} onValueChange={setTab} className="mt-6">
+          <TabsList className="grid w-full grid-cols-3 bg-secondary">
+            <TabsTrigger value="paste" className="font-mono text-xs gap-1.5">
+              <FileText className="w-3.5 h-3.5" /> Paste Text
+            </TabsTrigger>
+            <TabsTrigger value="upload" className="font-mono text-xs gap-1.5">
+              <Upload className="w-3.5 h-3.5" /> Upload File
+            </TabsTrigger>
+            <TabsTrigger value="url" className="font-mono text-xs gap-1.5">
+              <Link2 className="w-3.5 h-3.5" /> Submit URL
+            </TabsTrigger>
+          </TabsList>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="url" className="font-mono text-xs uppercase tracking-wider">URL (optional)</Label>
-              <Input
-                id="url"
-                placeholder="https://..."
-                value={form.url}
-                onChange={(e) => setForm({ ...form, url: e.target.value })}
-                className="bg-secondary border-border"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="geography" className="font-mono text-xs uppercase tracking-wider">Geography</Label>
-              <Input
-                id="geography"
-                placeholder="e.g. Africa, Global"
-                value={form.geography}
-                onChange={(e) => setForm({ ...form, geography: e.target.value })}
-                className="bg-secondary border-border"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="tags" className="font-mono text-xs uppercase tracking-wider">Tags (comma-separated)</Label>
-            <Input
-              id="tags"
-              placeholder="e.g. L2, identity, payments"
-              value={form.tags}
-              onChange={(e) => setForm({ ...form, tags: e.target.value })}
-              className="bg-secondary border-border"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="raw_text" className="font-mono text-xs uppercase tracking-wider">Document Text *</Label>
+          <TabsContent value="paste" className="mt-4">
             <Textarea
-              id="raw_text"
               placeholder="Paste the full document text here..."
-              value={form.raw_text}
-              onChange={(e) => setForm({ ...form, raw_text: e.target.value })}
+              value={rawText}
+              onChange={(e) => setRawText(e.target.value)}
               className="bg-secondary border-border min-h-[250px] font-mono text-sm"
             />
-          </div>
+          </TabsContent>
 
-          <Button
-            type="submit"
-            disabled={loading}
-            className="w-full h-12 font-mono text-sm uppercase tracking-widest glow-cyan"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="animate-spin mr-2" />
-                Analyzing...
-              </>
-            ) : (
-              "⚡ Analyze"
+          <TabsContent value="upload" className="mt-4">
+            <label className="flex flex-col items-center justify-center h-40 border-2 border-dashed border-border rounded-lg bg-secondary/50 cursor-pointer hover:border-primary/40 transition-colors">
+              <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+              <span className="text-sm text-muted-foreground">
+                {fileName || "Click to upload a text document (.txt, .md, .csv)"}
+              </span>
+              <input
+                type="file"
+                accept=".txt,.md,.csv,.json,.xml,.html"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+            </label>
+            {rawText && fileName && (
+              <p className="text-xs text-muted-foreground mt-2 font-mono">
+                ✓ Loaded {rawText.length.toLocaleString()} characters from {fileName}
+              </p>
             )}
-          </Button>
-        </form>
+          </TabsContent>
+
+          <TabsContent value="url" className="mt-4">
+            <Input
+              placeholder="https://example.com/proposal"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="bg-secondary border-border font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground mt-2">
+              We'll fetch and analyze the content at this URL.
+            </p>
+          </TabsContent>
+        </Tabs>
+
+        <Button
+          onClick={handleSubmit}
+          disabled={loading || !hasInput}
+          className="w-full h-12 font-mono text-sm uppercase tracking-widest mt-6 glow-primary"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="animate-spin mr-2" />
+              Analyzing...
+            </>
+          ) : (
+            "⚡ Analyze"
+          )}
+        </Button>
       </main>
     </div>
   );

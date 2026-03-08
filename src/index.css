@@ -6,48 +6,47 @@
 
 @layer base {
   :root {
-    --background: 220 20% 7%;
-    --foreground: 180 10% 90%;
+    --background: 260 20% 7%;
+    --foreground: 270 10% 90%;
 
-    --card: 220 18% 10%;
-    --card-foreground: 180 10% 90%;
+    --card: 260 18% 10%;
+    --card-foreground: 270 10% 90%;
 
-    --popover: 220 18% 10%;
-    --popover-foreground: 180 10% 90%;
+    --popover: 260 18% 10%;
+    --popover-foreground: 270 10% 90%;
 
-    --primary: 170 80% 45%;
-    --primary-foreground: 220 20% 7%;
+    --primary: 270 60% 65%;
+    --primary-foreground: 260 20% 7%;
 
-    --secondary: 220 15% 15%;
-    --secondary-foreground: 180 10% 80%;
+    --secondary: 260 15% 15%;
+    --secondary-foreground: 270 10% 80%;
 
-    --muted: 220 15% 13%;
-    --muted-foreground: 220 10% 50%;
+    --muted: 260 15% 13%;
+    --muted-foreground: 260 10% 50%;
 
     --accent: 45 90% 55%;
-    --accent-foreground: 220 20% 7%;
+    --accent-foreground: 260 20% 7%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 220 15% 18%;
-    --input: 220 15% 18%;
-    --ring: 170 80% 45%;
+    --border: 260 15% 18%;
+    --input: 260 15% 18%;
+    --ring: 270 60% 65%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 220 18% 10%;
-    --sidebar-foreground: 180 10% 90%;
-    --sidebar-primary: 170 80% 45%;
-    --sidebar-primary-foreground: 220 20% 7%;
-    --sidebar-accent: 220 15% 15%;
-    --sidebar-accent-foreground: 180 10% 80%;
-    --sidebar-border: 220 15% 18%;
-    --sidebar-ring: 170 80% 45%;
+    --sidebar-background: 260 18% 10%;
+    --sidebar-foreground: 270 10% 90%;
+    --sidebar-primary: 270 60% 65%;
+    --sidebar-primary-foreground: 260 20% 7%;
+    --sidebar-accent: 260 15% 15%;
+    --sidebar-accent-foreground: 270 10% 80%;
+    --sidebar-border: 260 15% 18%;
+    --sidebar-ring: 270 60% 65%;
 
     --success: 150 60% 45%;
     --warning: 45 90% 55%;
-    --cyan-glow: 170 80% 45%;
   }
 }
 
@@ -70,17 +69,17 @@
     font-family: 'Inter', system-ui, sans-serif;
   }
 
-  .glow-cyan {
+  .glow-primary {
     box-shadow: 0 0 20px -5px hsl(var(--primary) / 0.3);
   }
 
-  .glow-cyan-strong {
+  .glow-primary-strong {
     box-shadow: 0 0 30px -5px hsl(var(--primary) / 0.5);
   }
 
-  .text-gradient-cyan {
+  .text-gradient-primary {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, hsl(var(--primary)), hsl(170 60% 65%));
+    background-image: linear-gradient(135deg, hsl(var(--primary)), hsl(270 50% 78%));
   }
 
   .border-glow {
