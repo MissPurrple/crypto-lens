@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { getAnalysisById } from "@/lib/storage";
 import { exportAsMarkdown, exportAsPdf } from "@/lib/export";
 import { AppHeader } from "@/components/AppHeader";
@@ -6,11 +6,12 @@ import { LensCard } from "@/components/LensCard";
 import { LENSES } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ExternalLink, Download, FileText } from "lucide-react";
+import { ArrowLeft, ExternalLink, Download, FileText, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AnalysisDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const stored = id ? getAnalysisById(id) : undefined;
 
   if (!stored) {
@@ -85,6 +86,24 @@ export default function AnalysisDetailPage() {
               }}
             >
               <Download className="w-3.5 h-3.5" /> Export .pdf
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="font-mono text-xs gap-1.5"
+              onClick={() => {
+                navigate("/", {
+                  state: {
+                    prefill: {
+                      title: doc.title,
+                      url: doc.url || undefined,
+                    },
+                  },
+                });
+                toast.info(doc.url ? "URL pre-filled for re-analysis" : "Submit the document text again to re-analyze");
+              }}
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Re-analyze
             </Button>
           </div>
         </div>
