@@ -56,6 +56,18 @@ export default function AnalyzePage() {
         setRawText(prefill.raw_text);
         setTab("paste");
       }
+      // Pre-populate metadata fields
+      if (prefill.type) setDocType(prefill.type);
+      if (prefill.protocol) setProtocol(prefill.protocol);
+      if (prefill.chain) setChain(prefill.chain);
+      if (prefill.geography) setGeography(prefill.geography);
+      if (prefill.tags?.length) {
+        setTagsInput(prefill.tags.join(", "));
+        setMetaOpen(true);
+      }
+      if (prefill.protocol || prefill.chain || prefill.geography) {
+        setMetaOpen(true);
+      }
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
