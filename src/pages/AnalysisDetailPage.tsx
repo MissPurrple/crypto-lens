@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { getAnalysisById } from "@/lib/storage";
 import { exportAsMarkdown, exportAsPdf } from "@/lib/export";
@@ -12,7 +13,7 @@ import { toast } from "sonner";
 export default function AnalysisDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const stored = id ? getAnalysisById(id) : undefined;
+  const stored = useMemo(() => (id ? getAnalysisById(id) : undefined), [id]);
 
   if (!stored) {
     return (
@@ -29,22 +30,6 @@ export default function AnalysisDetailPage() {
   }
 
   const { document: doc, analysis } = stored;
-
-  const handleReanalyze = () => {
-    // Navigate to analyze page with a state hint to pre-populate
-    navigate("/", {
-      state: {
-        reanalyze: true,
-        url: doc.url || undefined,
-        title: doc.title,
-        type: doc.type,
-        protocol: doc.protocol,
-        chain: doc.chain,
-        geography: doc.geography,
-        tags: doc.tags,
-      },
-    });
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -114,6 +99,11 @@ export default function AnalysisDetailPage() {
                       title: doc.title,
                       url: doc.url || undefined,
                       raw_text: stored.raw_text || undefined,
+                      type: doc.type,
+                      protocol: doc.protocol,
+                      chain: doc.chain,
+                      geography: doc.geography,
+                      tags: doc.tags,
                     },
                   },
                 });

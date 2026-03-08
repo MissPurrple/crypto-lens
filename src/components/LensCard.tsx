@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { cn } from "@/lib/utils";
 import { Analysis, LENSES } from "@/lib/types";
 import { Crosshair, ShieldAlert, CheckCircle2, Wrench, Zap } from "lucide-react";
@@ -27,7 +28,7 @@ const dotColorMap: Record<string, string> = {
   power_snapshot: "bg-accent",
 };
 
-export function LensCard({ lensKey, bullets }: LensCardProps) {
+export const LensCard = memo(function LensCard({ lensKey, bullets }: LensCardProps) {
   const lens = LENSES.find((l) => l.key === lensKey);
   if (!lens) return null;
 
@@ -49,4 +50,4 @@ export function LensCard({ lensKey, bullets }: LensCardProps) {
       </ul>
     </div>
   );
-}
+});

@@ -2,10 +2,14 @@
 // xray-analyze edge function — hardened version
 // ============================================================================
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 // ---------------------------------------------------------------------------
 // Configuration constants
 // ---------------------------------------------------------------------------
 
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") || "").split(",").map((s) => s.trim()).filter(Boolean);
 
 const MAX_RAW_TEXT_LENGTH = 100_000;
@@ -45,10 +49,10 @@ const VALID_CHAINS = new Set([
 function getCorsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("Origin") || "";
 
-  // If no allowed origins configured, fall back to restrictive default
+  // If no allowed origins configured, reject all cross-origin requests
   if (ALLOWED_ORIGINS.length === 0) {
     return {
-      "Access-Control-Allow-Origin": origin,
+      "Access-Control-Allow-Origin": "",
       "Access-Control-Allow-Headers":
         "authorization, x-client-info, apikey, content-type",
       "Vary": "Origin",
@@ -57,9 +61,10 @@ function getCorsHeaders(req: Request): Record<string, string> {
 
   const allowed = ALLOWED_ORIGINS.includes(origin);
   return {
-    "Access-Control-Allow-Origin": allowed ? origin : ALLOWED_ORIGINS[0],
+    "Access-Control-Allow-Origin": allowed ? origin : "",
     "Access-Control-Allow-Headers":
       "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Vary": "Origin",
   };
 }
@@ -70,7 +75,7 @@ function getCorsHeaders(req: Request): Record<string, string> {
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
-function isRateLimited(ip: string): boolean {
+function checkRateLimit(ip: string, maxRequests: number): boolean {
   const now = Date.now();
   const entry = rateLimitMap.get(ip);
 
@@ -80,7 +85,7 @@ function isRateLimited(ip: string): boolean {
   }
 
   entry.count++;
-  return entry.count > RATE_LIMIT_MAX_REQUESTS;
+  return entry.count > maxRequests;
 }
 
 // Periodically prune stale entries to prevent memory leaks
@@ -278,6 +283,13 @@ Rules:
 // JSON response helpers
 // ---------------------------------------------------------------------------
 
+const SECURITY_HEADERS: Record<string, string> = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Cache-Control": "no-store",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+};
+
 function jsonResponse(
   body: Record<string, unknown>,
   status: number,
@@ -285,7 +297,7 @@ function jsonResponse(
 ): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...corsHeaders, ...SECURITY_HEADERS, "Content-Type": "application/json" },
   });
 }
 
@@ -411,17 +423,24 @@ Deno.serve(async (req) => {
     return errorResponse("Method not allowed", 405, corsHeaders, requestId);
   }
 
-  // Authenticated users get higher rate limits
+  // Verify JWT cryptographically via Supabase auth
   const authHeader = req.headers.get("authorization");
   let isAuthenticated = false;
 
-  if (authHeader?.startsWith("Bearer ")) {
-    // The Supabase client automatically sends the user's JWT.
-    // We don't need to verify it here since Supabase edge functions
-    // can use the createClient to verify, but for rate limiting
-    // purposes we trust that a valid-looking JWT means an auth attempt.
-    // The actual JWT verification happens via Supabase's built-in middleware.
-    isAuthenticated = true;
+  if (authHeader?.startsWith("Bearer ") && SUPABASE_URL && SUPABASE_ANON_KEY) {
+    try {
+      const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: { headers: { Authorization: authHeader } },
+        auth: { persistSession: false },
+      });
+      const { data: { user }, error } = await supabaseClient.auth.getUser();
+      if (user && !error) {
+        isAuthenticated = true;
+      }
+    } catch {
+      // JWT verification failed — treat as unauthenticated
+      console.warn(`[${requestId}] JWT verification failed, treating as unauthenticated`);
+    }
   }
 
   // Rate limiting by IP (authenticated users get 3x the limit)
@@ -434,13 +453,9 @@ Deno.serve(async (req) => {
     ? RATE_LIMIT_MAX_REQUESTS * 3
     : RATE_LIMIT_MAX_REQUESTS;
 
-  if (isRateLimited(clientIp)) {
-    // Check against the effective limit (re-check with higher limit for auth users)
-    const entry = rateLimitMap.get(clientIp);
-    if (entry && entry.count > effectiveRateLimit) {
-      console.warn(`Rate limited: ${clientIp} (request: ${requestId}, auth: ${isAuthenticated})`);
-      return errorResponse("Too many requests. Please try again later.", 429, corsHeaders, requestId);
-    }
+  if (checkRateLimit(clientIp, effectiveRateLimit)) {
+    console.warn(`Rate limited: ${clientIp} (request: ${requestId}, auth: ${isAuthenticated})`);
+    return errorResponse("Too many requests. Please try again later.", 429, corsHeaders, requestId);
   }
 
   try {
@@ -543,7 +558,7 @@ Deno.serve(async (req) => {
           );
         }
 
-        // Enforce size limit on response
+        // Enforce size limit on response — check header first, then stream
         const contentLength = fetchRes.headers.get("content-length");
         if (contentLength && parseInt(contentLength, 10) > MAX_FETCH_BODY_BYTES) {
           return errorResponse(
@@ -554,17 +569,36 @@ Deno.serve(async (req) => {
           );
         }
 
-        const bodyBytes = await fetchRes.arrayBuffer();
-        if (bodyBytes.byteLength > MAX_FETCH_BODY_BYTES) {
-          return errorResponse(
-            "URL content exceeds maximum size (5MB)",
-            400,
-            corsHeaders,
-            requestId,
-          );
+        // Stream response body with size limit to prevent OOM from huge responses
+        const reader = fetchRes.body?.getReader();
+        if (!reader) {
+          return errorResponse("URL returned no body", 400, corsHeaders, requestId);
+        }
+        const chunks: Uint8Array[] = [];
+        let totalBytes = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          totalBytes += value.byteLength;
+          if (totalBytes > MAX_FETCH_BODY_BYTES) {
+            reader.cancel();
+            return errorResponse(
+              "URL content exceeds maximum size (5MB)",
+              400,
+              corsHeaders,
+              requestId,
+            );
+          }
+          chunks.push(value);
         }
 
-        rawText = new TextDecoder().decode(bodyBytes);
+        const merged = new Uint8Array(totalBytes);
+        let offset = 0;
+        for (const chunk of chunks) {
+          merged.set(chunk, offset);
+          offset += chunk.byteLength;
+        }
+        rawText = new TextDecoder().decode(merged);
 
         // Strip HTML for plain-text extraction
         rawText = rawText.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "");

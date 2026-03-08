@@ -19,7 +19,7 @@ import { Trash2, Search, FileText, GitCompareArrows } from "lucide-react";
 import { toast } from "sonner";
 
 export default function DashboardPage() {
-  const [analyses, setAnalyses] = useState(getStoredAnalyses());
+  const [analyses, setAnalyses] = useState(() => getStoredAnalyses());
   const [search, setSearch] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
