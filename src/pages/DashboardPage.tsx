@@ -5,7 +5,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Trash2, Search, FileText } from "lucide-react";
+import { Trash2, Search, FileText, GitCompareArrows } from "lucide-react";
 import { toast } from "sonner";
 
 export default function DashboardPage() {
@@ -34,7 +34,16 @@ export default function DashboardPage() {
       <main className="container max-w-5xl py-8">
         <div className="mb-8">
           <h1 className="text-2xl font-mono font-bold text-gradient-primary mb-2">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Your locally stored analyses.</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">Your locally stored analyses.</p>
+            {analyses.length >= 2 && (
+              <Link to="/compare">
+                <Button variant="outline" size="sm" className="font-mono text-xs gap-1.5">
+                  <GitCompareArrows className="w-3.5 h-3.5" /> Compare
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
 
         <div className="relative mb-6">
