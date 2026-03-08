@@ -1,10 +1,15 @@
 import { cn } from "@/lib/utils";
 import { Analysis, LENSES } from "@/lib/types";
+import { Crosshair, ShieldAlert, CheckCircle2, Wrench, Zap } from "lucide-react";
 
 interface LensCardProps {
   lensKey: keyof Pick<Analysis, "effectiveness" | "devil_advocate" | "best_points" | "could_do_better" | "power_snapshot">;
   bullets: string[];
 }
+
+const iconMap: Record<string, React.ElementType> = {
+  Crosshair, ShieldAlert, CheckCircle2, Wrench, Zap,
+};
 
 const colorMap: Record<string, string> = {
   effectiveness: "border-primary/30 bg-primary/5",
@@ -26,10 +31,12 @@ export function LensCard({ lensKey, bullets }: LensCardProps) {
   const lens = LENSES.find((l) => l.key === lensKey);
   if (!lens) return null;
 
+  const Icon = iconMap[lens.icon];
+
   return (
     <div className={cn("rounded-lg border p-5", colorMap[lensKey])}>
       <h3 className="font-mono text-sm font-semibold mb-3 flex items-center gap-2">
-        <span>{lens.icon}</span>
+        {Icon && <Icon className="w-4 h-4" />}
         <span className="uppercase tracking-wider">{lens.title}</span>
       </h3>
       <ul className="space-y-2">
