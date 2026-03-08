@@ -95,13 +95,12 @@ export default function AnalysisDetailPage() {
                 navigate("/", {
                   state: {
                     prefill: {
-                      text: analysis.raw_response ? undefined : undefined,
                       title: doc.title,
-                      url: doc.url,
-                      rawText: analysis.raw_response,
+                      url: doc.url || undefined,
                     },
                   },
                 });
+                toast.info(doc.url ? "URL pre-filled for re-analysis" : "Submit the document text again to re-analyze");
               }}
             >
               <RotateCcw className="w-3.5 h-3.5" /> Re-analyze
