@@ -27,6 +27,9 @@ export default function AnalyzePage() {
       if (prefill.url) {
         setUrl(prefill.url);
         setTab("url");
+      } else if (prefill.raw_text) {
+        setRawText(prefill.raw_text);
+        setTab("paste");
       }
       window.history.replaceState({}, document.title);
     }
