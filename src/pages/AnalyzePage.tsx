@@ -27,6 +27,9 @@ export default function AnalyzePage() {
       if (prefill.url) {
         setUrl(prefill.url);
         setTab("url");
+      } else if (prefill.raw_text) {
+        setRawText(prefill.raw_text);
+        setTab("paste");
       }
       window.history.replaceState({}, document.title);
     }
@@ -86,6 +89,7 @@ export default function AnalyzePage() {
         id: crypto.randomUUID(),
         document: data.document,
         analysis: data.analysis,
+        raw_text: input.text || undefined,
       };
 
       saveAnalysis(stored);

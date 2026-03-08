@@ -46,6 +46,7 @@ export interface StoredAnalysis {
   id: string;
   document: DocumentMeta;
   analysis: Analysis;
+  raw_text?: string;
 }
 
 export interface LensConfig {

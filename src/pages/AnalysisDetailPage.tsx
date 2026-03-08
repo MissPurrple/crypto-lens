@@ -97,10 +97,11 @@ export default function AnalysisDetailPage() {
                     prefill: {
                       title: doc.title,
                       url: doc.url || undefined,
+                      raw_text: stored.raw_text || undefined,
                     },
                   },
                 });
-                toast.info(doc.url ? "URL pre-filled for re-analysis" : "Submit the document text again to re-analyze");
+                toast.info(doc.url ? "URL pre-filled for re-analysis" : stored.raw_text ? "Text pre-filled for re-analysis" : "Submit the document text again to re-analyze");
               }}
             >
               <RotateCcw className="w-3.5 h-3.5" /> Re-analyze
