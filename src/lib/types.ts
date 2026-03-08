@@ -56,9 +56,9 @@ export interface LensConfig {
 }
 
 export const LENSES: LensConfig[] = [
-  { key: "effectiveness", title: "Effectiveness", icon: "🎯", color: "primary" },
-  { key: "devil_advocate", title: "Devil's Advocate", icon: "😈", color: "destructive" },
-  { key: "best_points", title: "Best Points", icon: "✅", color: "success" },
-  { key: "could_do_better", title: "Could Do Better", icon: "🔧", color: "warning" },
-  { key: "power_snapshot", title: "Power & Incentives", icon: "⚡", color: "accent" },
+  { key: "effectiveness", title: "Effectiveness", icon: "Crosshair", color: "primary" },
+  { key: "devil_advocate", title: "Devil's Advocate", icon: "ShieldAlert", color: "destructive" },
+  { key: "best_points", title: "Best Points", icon: "CheckCircle2", color: "success" },
+  { key: "could_do_better", title: "Could Do Better", icon: "Wrench", color: "warning" },
+  { key: "power_snapshot", title: "Power & Incentives", icon: "Zap", color: "accent" },
 ];
