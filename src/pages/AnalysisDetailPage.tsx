@@ -1,10 +1,13 @@
 import { useParams, Link } from "react-router-dom";
 import { getAnalysisById } from "@/lib/storage";
+import { exportAsMarkdown, exportAsPdf } from "@/lib/export";
 import { AppHeader } from "@/components/AppHeader";
 import { LensCard } from "@/components/LensCard";
 import { LENSES } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, ExternalLink, Download, FileText } from "lucide-react";
+import { toast } from "sonner";
 
 export default function AnalysisDetailPage() {
   const { id } = useParams<{ id: string }>();
