@@ -38,7 +38,7 @@ export interface Analysis {
   best_points: string[];
   could_do_better: string[];
   power_snapshot: string[];
-  raw_response: string;
+  raw_response?: string;
   created_at: string;
 }
 

@@ -12,6 +12,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, FileText, Link2, Upload } from "lucide-react";
 import { toast } from "sonner";
 
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_SIZE_LABEL = "5MB";
+
+function isValidHttpUrl(input: string): boolean {
+  try {
+    const url = new URL(input);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 export default function AnalyzePage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -23,6 +35,13 @@ export default function AnalyzePage() {
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      toast.error(`File too large. Maximum size is ${MAX_FILE_SIZE_LABEL}.`);
+      e.target.value = "";
+      return;
+    }
+
     setFileName(file.name);
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -31,12 +50,15 @@ export default function AnalyzePage() {
       setTab("paste");
       toast.success(`Loaded "${file.name}"`);
     };
+    reader.onerror = () => {
+      toast.error("Failed to read file");
+    };
     reader.readAsText(file);
   }, []);
 
   const getInputText = (): { text: string; title: string } | null => {
     if (tab === "paste" && rawText.trim()) {
-      const title = rawText.trim().split("\n")[0].slice(0, 100);
+      const title = rawText.trim().split("\n")[0]?.slice(0, 100) ?? "Untitled";
       return { text: rawText.trim(), title };
     }
     if (tab === "url" && url.trim()) {
@@ -46,6 +68,19 @@ export default function AnalyzePage() {
   };
 
   const handleSubmit = async () => {
+    // Validate URL before sending
+    if (tab === "url") {
+      const trimmedUrl = url.trim();
+      if (!trimmedUrl) {
+        toast.error("Please enter a URL");
+        return;
+      }
+      if (!isValidHttpUrl(trimmedUrl)) {
+        toast.error("Please enter a valid HTTP or HTTPS URL");
+        return;
+      }
+    }
+
     const input = getInputText();
     if (!input) {
       toast.error("Please paste text, upload a document, or enter a URL");
@@ -79,9 +114,10 @@ export default function AnalyzePage() {
       saveAnalysis(stored);
       toast.success("Analysis complete");
       navigate(`/analysis/${stored.id}`);
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message || "Analysis failed. Please try again.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Analysis failed. Please try again.";
+      console.error("Analysis error:", err);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -128,7 +164,7 @@ export default function AnalyzePage() {
             <label className="flex flex-col items-center justify-center h-40 border-2 border-dashed border-border rounded-lg bg-secondary/50 cursor-pointer hover:border-primary/40 transition-colors">
               <Upload className="w-8 h-8 text-muted-foreground mb-2" />
               <span className="text-sm text-muted-foreground">
-                {fileName || "Click to upload a text document (.txt, .md, .csv)"}
+                {fileName || `Click to upload a text document (max ${MAX_FILE_SIZE_LABEL})`}
               </span>
               <input
                 type="file"
@@ -139,7 +175,7 @@ export default function AnalyzePage() {
             </label>
             {rawText && fileName && (
               <p className="text-xs text-muted-foreground mt-2 font-mono">
-                ✓ Loaded {rawText.length.toLocaleString()} characters from {fileName}
+                Loaded {rawText.length.toLocaleString()} characters from {fileName}
               </p>
             )}
           </TabsContent>
@@ -150,6 +186,7 @@ export default function AnalyzePage() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               className="bg-secondary border-border font-mono text-sm"
+              type="url"
             />
             <p className="text-xs text-muted-foreground mt-2">
               We'll fetch and analyze the content at this URL.
@@ -168,7 +205,7 @@ export default function AnalyzePage() {
               Analyzing...
             </>
           ) : (
-            "⚡ Analyze"
+            "Analyze"
           )}
         </Button>
       </main>
