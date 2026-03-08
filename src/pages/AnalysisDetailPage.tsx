@@ -6,7 +6,7 @@ import { LensCard } from "@/components/LensCard";
 import { LENSES } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ExternalLink, Download, FileText, RotateCw } from "lucide-react";
+import { ArrowLeft, ExternalLink, Download, FileText, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AnalysisDetailPage() {
@@ -107,9 +107,20 @@ export default function AnalysisDetailPage() {
               variant="outline"
               size="sm"
               className="font-mono text-xs gap-1.5"
-              onClick={handleReanalyze}
+              onClick={() => {
+                navigate("/", {
+                  state: {
+                    prefill: {
+                      title: doc.title,
+                      url: doc.url || undefined,
+                      raw_text: stored.raw_text || undefined,
+                    },
+                  },
+                });
+                toast.info(doc.url ? "URL pre-filled for re-analysis" : stored.raw_text ? "Text pre-filled for re-analysis" : "Submit the document text again to re-analyze");
+              }}
             >
-              <RotateCw className="w-3.5 h-3.5" /> Re-analyze
+              <RotateCcw className="w-3.5 h-3.5" /> Re-analyze
             </Button>
           </div>
         </div>

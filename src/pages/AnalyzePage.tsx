@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useCallback, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,6 +31,7 @@ function isValidHttpUrl(input: string): boolean {
 
 export default function AnalyzePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("paste");
   const [rawText, setRawText] = useState("");
@@ -44,6 +45,20 @@ export default function AnalyzePage() {
   const [chain, setChain] = useState("");
   const [geography, setGeography] = useState("");
   const [tagsInput, setTagsInput] = useState("");
+
+  useEffect(() => {
+    const prefill = (location.state as any)?.prefill;
+    if (prefill) {
+      if (prefill.url) {
+        setUrl(prefill.url);
+        setTab("url");
+      } else if (prefill.raw_text) {
+        setRawText(prefill.raw_text);
+        setTab("paste");
+      }
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -138,6 +153,7 @@ export default function AnalyzePage() {
         id: crypto.randomUUID(),
         document: data.document,
         analysis: data.analysis,
+        raw_text: input.text || undefined,
       };
 
       saveAnalysis(stored);
